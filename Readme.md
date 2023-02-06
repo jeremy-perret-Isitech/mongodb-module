@@ -204,7 +204,9 @@ Dans le cli de MongoDB Compass, `db` est un alias vers la bdd en cours d’éxec
 # Exercices
 
 Question du fichier exoBook.md
-Si les images ne s'affiche pas correctement : https://observant-sunflower-c88.notion.site/Mongo-DB-548c9379efcc495390dda8e8c907ddaa
+
+Si les images ne s'affiche pas correctement : 
+https://observant-sunflower-c88.notion.site/Mongo-DB-548c9379efcc495390dda8e8c907ddaa
 
 Pour créer une base de données nommée "sample_db" on utilise la commande `use sample_db`, cette commande ne créera pas la base de donnée immédiatement mais lors de l’ajout d’une preimère collection.
 
