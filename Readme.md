@@ -1,10 +1,14 @@
 # Mongo DB
 
+Si les images ne s'affiche pas correctement : [View on Notion](https://www.notion.so/Mongo-DB-548c9379efcc495390dda8e8c907ddaa)
+
 À faire : 
 
 - Comment renommer une collection
 - Expliquer la méthode `findAndModify`
 - Lever une exception grâce aux validateurs
+- Diminué le temp d’une requête avec les indexation (montrer des analyses)
+- Comment arrondir un nombre grâce à la pipeline ($round)
 
 Collection : ensemble de documents (Equivalent d’une table dans une bdd)
 
@@ -377,9 +381,283 @@ Dans le cli de MongoDB Compass, `db` est un alias vers la bdd en cours d’éxec
     ```
     
 
+### Les index
+
+l’indéxation réduis le temps d’écriture, mais améliore le temps de lecture
+
+Il faut ciblé à indexé en priorité les champs chercher en priorité lors d’une requête
+
+Algolia et elk (elasticsearch) sont des outils qui facilite la gestion des index
+
+La nature de votre application devra impacter votre logique d’indexation : est elle orienté écriture (write-heavy) ? ou lecture (read-heavy)
+
+Créer un index pour une collection
+
+```jsx
+db.collection.createIndex(<champ + type>, <option?>)
+
+// Example :
+db.collection.createIndex({ "age": -1 }) // -1 correspond à l'ordre d'apparition
+// 1 = croissant
+// -1 = décroissant
+
+// Passer des options à la méthode "createIndex"
+
+db.collection.createIndex({ "age": -1 }, { "name": "index_age" }) 
+// l'index sera nommé "index_age" 
+
+db.collection.createIndex({ "age": -1 }, { "background": true })
+// la création de l'index se fera en background
+
+db.collection.createIndex(
+	{
+		"age": -1,
+		"nom": 1
+	},
+	{
+		"name": "index_age_nom",
+		"background": true,
+		"collation": {
+			"locale": "fr"
+		}
+	}
+)
+```
+
+Un index peut  porter sur plusieurs champs : c’est un index composé.
+
+L’ordre dans lequel les champs son énuméré son important
+
+Supprimer un index
+
+```jsx
+db.collection.dropIndex("index_-name")
+```
+
+Supprimer et ajouter des indexes sur une grosse base de donné peut avoir un effet négatif sur l’utilisation de celle-ci pendant la modification. (Provoquer des ralentissements)
+
+### Les requêtes géospaciales
+
+il existe 2 type d’index pour les requêtes géospaciales :
+
+- l’index `2dsphere`, utilisé pour les requêtes géospaciales intervenant sur une surface sphérique
+- l’index `2d`, utiliser pour les requêtes sur un plan Euclidien.
+
+Créer un index géospaciale
+
+```jsx
+db.cartographie.createIndex({ "donneesSpaciales": "2d" })
+db.cartographie.createIndex({ "donneesSpaciales": "2dsphere" })
+```
+
+Les index 2d font intervenir des coordonnes de type `legacy`
+
+Différentes manière de créer un point géographique
+
+```jsx
+db.plan.insertOne({ "nom": "firstPoint" }, { "geodata": [1,1] })
+
+db.plan.insertOne({ "nom": "firstPoint_bis"}, { "geodata": [4.7, 44.5] })
+
+db.plan.insertOne({ "nom": "firstPoint_bis"}, { "geodata": {"long": 4.7, "lat": 44.5 }})
+```
+
+### Le type GeoJson
+
+[RFC 7946 GeoJson](https://www.rfc-editor.org/rfc/rfc7946)
+
+Les différents type geoJson :
+
+- Point
+- MultiPoint
+- LineString
+- MultiLineString
+- Polygon
+- MultiPolygon
+
+### L’opérateur $nearSphere
+
+```jsx
+{
+    $nearSphere: {
+        $geometry {
+            "type": "Point",
+            "coordinate": [<longitude>, <latitude>]
+        },
+        $minDistance: <distance en metre>
+        $maxDistance: <distance en metre>
+    }
+}
+{
+    $nearSphere: [<longitude>, <latitude>]
+    $minDistance: <distance en metre>
+    $maxDistance: <distance en metre>
+}
+```
+
+### L’opérateur $geoWithin
+
+Cet opérateur n’effectue aucun tri et ne necessite pas la création d’un index geospaciale, on l’utilise de la maniere suivante.
+
+```jsx
+const polygone = [
+    [43.9548, 4.80143],
+    [43.95475, 4.80779],
+    [43.95045, 4.81097],
+    [43.4657, 4.80449]
+];
+
+db.avignon2d.find( 
+	{
+		"localisation": { $geoWithin: { $polygon: polygone }} 
+	}
+)
+```
+
+```jsx
+const coord = {
+    "type": "Point",
+    "coordinates": [43.94985229378091, 4.8055980697123415]
+}
+
+db.avignon.find( 
+	{
+		"localisation": { $nearSphere: { $geometry: coord }} 
+	}
+)
+```
+
+### La méthode aggregate
+
+$match dois être utilisé le plus en amont possible
+
+on peut construire la requête en amont 
+
+Quelques examples :
+
+```jsx
+const pipeline = [{
+    $match: {
+        "interets": "jardinage"
+    }
+}]
+db.personnes.aggregate(pipeline)
+```
+
+```jsx
+const pipeline = [
+    {
+        $match: {
+            "interets": "cuisine"
+        }
+    },
+    {
+        $project: {
+            "_id": 0,
+            "nom": 1,
+            "prenom": 1,
+            "ville": "$adresse.ville"
+        }
+    },
+    {
+        $match: {
+            "ville": { $exists: true }
+        }
+    }
+]
+db.personnes.aggregate(pipeline)
+```
+
+### L’opérateur $addFields
+
+permet d’ajouter des champs dans le retour de la requête
+
+Example: 
+
+```jsx
+db.personnes.aggregate({
+	$addFields: {
+		"numero_secu": ""
+	}
+})
+/// renvoie la liste des document avec un nouveau champ "numero_secu"
+```
+
+### L’opérateur $group
+
+Synthaxe
+
+```jsx
+{
+	$group: {
+		"_id": <expression>,
+		<champ>: { <operateur d'accumulation> }
+	}
+}
+```
+
+### Les opérateurs d’accumulaation
+
+- $push
+- $sum
+- $avg
+- $min
+- $max
+
+```jsx
+const pipeline = [{
+	$group: {
+		"_id": "$age",
+		"nombre_personnes": { $sum: 1 }
+	}
+}]
+db.personnes.aggregate(pipeline)
+```
+
+L’opérateur $sortByCount permet de faire ce que fait la pipeline ci dessus
+
+```jsx
+const pipeline = [{
+	$group: {
+		"_id": null, /// Ne filtre pas les éléments de la collection
+		"nombre_personnes": { $sum: 1 }
+	}
+}]
+db.personnes.aggregate(pipeline)
+```
+
+Par exemple celà nous permets de calculer l’age moyen
+
+```jsx
+const pipeline = [
+	{
+		$match: {
+			"age": { $exists: 1 }
+		}
+	},
+	{
+		$group: {
+			"_id": null,
+			"avg": {
+				$avg: "$age"
+			}
+		}
+	},
+	{
+		$project: {
+			"_id": 0,
+			"Age_moyen": {
+				$ceil: "$avg"
+			}
+		}
+	}
+];
+db.personnes.aggregate(pipeline)
+```
+
 # Exercices
 
-- Questions faites en cour
+- Questions posé en cour
     
     Afficher les comptes dont la sommes des opérations de débit est supérieur au montant du crédit.
     
@@ -460,9 +738,44 @@ Dans le cli de MongoDB Compass, `db` est un alias vers la bdd en cours d’éxec
     )
     ```
     
+    Que ce passe t’il dans cette requête
+    
+    ```jsx
+    db.achats.aggregate([{
+    	$addFields: {
+    		"total_achats": {
+    			$sum: "$achats"
+    		}, "total_reduc": {
+    			$sum: "$reductions"
+    		}
+    	}
+    }, {
+    	$addFields: {
+    		"total_final": {
+    			$subtract: ["$total_achats", "$total_reduc"]
+    		}
+    	}
+    }, {
+    	$project: {
+    		"_id": 0, "nom": 1, "prenom": 1, "Total payé": {
+    			$divide: [{
+    				$subtract: [{ $multiply: ['$total_final', 100] }, {
+    					$mod: [{ $multiply: ['$total_final', 100] }, 1]
+    				}]
+    			}, 100]
+    		}
+    	}
+    }])
+    ```
+    
+    Le premier $addFields va ajouter deux champs, le premier correspond au nombre total d’achat et le second correspond au nombre total de réduction, les deux sont calculés grâce à l’opérateur $sum
+    
+    Le second $addFields va ajouter un champ total final, qui va correspondre au total des achats moins le nombre de réduction, ce qui correspond probablement au prix final à payer.
+    
+    Pour terminer, l’opérateur $Project va faire la projection des éléments à renvoyé. Ici le champs _id sera masqué, le champ nom prenom sera afficher, et le champ “Total payé” sera affiché avec une valeur arrondi au centième près
+    
 - Questions du fichier exoBook.md
     
-    Si les images ne s'affiche pas correctement : [View on Notion](https://www.notion.so/Mongo-DB-548c9379efcc495390dda8e8c907ddaa)
     
     Pour créer une base de données nommée "sample_db" on utilise la commande `use sample_db`, cette commande ne créera pas la base de donnée immédiatement mais lors de l’ajout d’une preimère collection.
     
@@ -913,13 +1226,234 @@ Dans le cli de MongoDB Compass, `db` est un alias vers la bdd en cours d’éxec
     Question 19 :
     
     ```jsx
+    const currentDate = new Date()
     db.salles.updateMany(
     	{
     		"nom": { $regex: "[^aeiou]+$" }
     	},
     	{
-    		$inc: { "capacite" : 150},
-    		$set: { "contact": { "telephone": "04 11 94 00 10" }}
+    		$push: {
+    			"avis": { "date": currentDate, "note": 10 } 
+    		}
+    	},
+    )
+    ```
+    
+    Question 20 :
+    
+    ```jsx
+    db.salles.update(
+    	{
+    		"nom": { $regex: "^[zZ].*" }
+    	},
+    	{
+    		$set: {
+    			"nom": "Pub Z",
+    			"capacite": NumberInt(50),
+    			"smac": false
+    		}
+    	},
+    	{
+    		$upsert: true
     	}
     )
+    ```
+    
+    Question 21 :
+    
+    ```jsx
+    db.salles.aggregate(
+    	[
+    		{
+    			$match: {
+    				"_id": { $type: "objectId" }
+    			}
+    		},
+    		{
+    			$count: "document objectId"
+    		}
+    	]
+    )
+    ```
+    
+    L’opérateur type permet d’effectuer des vérification sur le type de la valeur.
+    
+    Question 22 :
+    
+    ```jsx
+    db.salles.aggregate(
+    	[
+    		{
+    			$match: {
+    				"_id": {
+    					$not: {
+    						$type: "objectId"
+    					}
+    				}
+    			}
+    		},
+    		{
+    			$sort: { "capacite": -1 }
+    		},
+    		{
+    			$limit: 1
+    		},
+    		{
+    			$project: {
+    				"_id": 0,
+    				"nom": 1
+    			}
+    		}
+    	]
+    )
+    ```
+    
+    Question 23 :
+    
+    ```jsx
+    db.salles.update(
+    	{
+    		"_id": 4
+    	},
+    	{
+    		$set: {
+    			"nom": "Nom de salle",
+    			"capacite": NumberInt(60)
+    		}
+    	}
+    )
+    ```
+    
+    Question 24 :
+    
+    ```jsx
+    db.salles.deleteOne(
+    	{
+    		"_id": { $type: 'objectId' },
+    		"capacite": { $lte: 60 }
+    	}
+    )
+    ```
+    
+    Question 25 :
+    
+    ```jsx
+    db.salles.findOneAndUpdate(
+    	{
+    		"adresse.ville": 'Nîmes'
+    	},
+    	{
+    		$set: { "capacite": 15 }
+    	}
+    )
+    ```
+    
+- Questions du fichier index.md
+    
+    Question 1
+    
+    ```jsx
+    db.salles.find({"capacite": {$gt: 500}, "adresse.codePostal": /^30/}) 
+    db.salles.find({"adresse.codePostal": /^30/, "capacite": {$lte: 400}})
+    ```
+    
+    Si ces deux requêtes sont faites fréquemment, je pense qu’utiliser un index sur le champs capaciter serais le plus adapté, car une expression régulière est utilisé pour trouver le code postal alors que l’opérateur $gt est utiliser pour filtrer la capacité, ce qui me semble moins performant, c’est pour celà que ce champ me semble plus adapter.
+    
+    Mais il est également possible de créer un index sur chacun d’entre eux.
+    
+    Voici comment créer un index nommer “index_capaciter”
+    
+    ```jsx
+    db.personnes.createIndex(
+    	{
+    		"capacite": 1
+    	},
+    	{
+    		"name": "index_capaciter"
+    	}
+    )
+    ```
+    
+    Pour supprimer un index, il faut utiliser la méthode `dropIndex()`, en passant le nom de l’index à supprimer.
+    
+    Code correspondant 
+    
+    ```jsx
+    db.personnes.dropIndex("index_capaciter")
+    ```
+    
+- Questions du fichier aggregation.md
+    
+    Question 1
+    
+    ```jsx
+    const pipeline = [
+    	{
+    		$match: {
+    			"capacite": { $gt: 50 }
+    		}
+    	},
+    	{
+    		$project: {
+    			"_id": 0,
+    			"ville": "$adresse.ville",
+    			"grande": {
+    				$gt: ["$capacite", 1000]
+    			}
+    		}
+    	}
+    ];
+    db.salles.aggregate(pipeline)
+    ```
+    
+    Question 2 :
+    
+    ```jsx
+    const pipeline = [
+    	{
+    		$match: {
+    			"capacite": { $exists: true }
+    		}
+    	},
+    	{
+    		$project: {
+    			"_id": 0,
+    			"nom": 1,
+    			"avant_extension": "$capacite",
+    			"apres_extension": {
+    				$sum: ["$capacite", 100]
+    			}
+    		}
+    	}
+    ];
+    db.salles.aggregate(pipeline)
+    ```
+    
+    Question 3 :
+    
+    ```jsx
+    const pipeline = [
+    	{
+    		$match: {
+    			"adresse.codePostal": { $exists: true }
+    		}
+    	},
+    	{
+    		$sort: { "adresse.codePostal": 1 }
+    	},
+    	{
+    		$project: {
+    			"_id": 0,
+    			"departement": "$adresse.codePostal",
+    			"capacite": "$capacite",
+    		}
+    	}
+    ];
+    db.salles.aggregate(pipeline)
+    ```
+    
+    Question 4 :
+    
+    ```jsx
+    
     ```

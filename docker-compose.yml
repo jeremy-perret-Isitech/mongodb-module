@@ -4,7 +4,6 @@ version: '3.3'
 services:
   mongo:
     image: mongo
-    restart: always
     container_name: mongo-docker
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
