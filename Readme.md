@@ -2,6 +2,8 @@
 
 Si les images ne s'affiche pas correctement : [View on Notion](https://www.notion.so/Mongo-DB-548c9379efcc495390dda8e8c907ddaa)
 
+[Examens TP](https://www.notion.so/Examens-TP-774cdf708d8d4d23b601759414bd6432)
+
 À faire : 
 
 - Comment renommer une collection
@@ -381,11 +383,11 @@ Dans le cli de MongoDB Compass, `db` est un alias vers la bdd en cours d’éxec
     ```
     
 
-### Les index
+### Les indexes
 
 l’indéxation réduis le temps d’écriture, mais améliore le temps de lecture
 
-Il faut ciblé à indexé en priorité les champs chercher en priorité lors d’une requête
+Il faut ciblé à indexé en priorité les champs cherché en priorité lors d’une requête
 
 Algolia et elk (elasticsearch) sont des outils qui facilite la gestion des index
 
@@ -1453,7 +1455,3 @@ db.personnes.aggregate(pipeline)
     ```
     
     Question 4 :
-    
-    ```jsx
-    
-    ```
